@@ -13,11 +13,12 @@ def gaussian_dpmm(N_dp=20, data=np.array([10., 11., 12., -10., -11., -12.])):
         pi_k:: Stick-breaking weights
     """
     # Hyperpriors
+    ## for phi_k
     mu_0 = pymc.Normal('mu_0', mu=0, tau=0.01, value=0)
     sig_0 = pymc.Uniform('sig_0', lower=0, upper=100, value=1)
     tau_0 = pymc.Lambda('tau_0', lambda s=sig_0: s**-2)
-    #tau_0 = sig_0 ** -2
 
+    ## for data
     sig_x = pymc.Uniform('sig_x', lower=0, upper=100)
     tau_x = pymc.Lambda('tau_x', lambda s=sig_x: s**-2)
 
