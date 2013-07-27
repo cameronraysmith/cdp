@@ -16,7 +16,8 @@ def load_cdp_run(pickledb="cdp.pickle"):
     pass
 
 def fit_cdp():
-    model = vars(cdp)
+    #model = vars(cdp)
+    model = cdp.model()
 
     #mc.MAP(model).fit(method='fmin_powell')
     mc.MAP(model).fit(method='fmin')
@@ -33,9 +34,9 @@ def fit_cdp():
     #     [m.lagtime, m.linslope, m.carcap, m.sigma])
 
     # low for testing
-    m.sample(iter=6000, burn=5000, thin=1)
+    #m.sample(iter=6000, burn=5000, thin=1)
     # medium
-    #m.sample(iter=10000, burn=5000, thin=5)
+    m.sample(iter=10000, burn=8000, thin=2)
     # long
     #m.sample(iter=50000, burn=40000, thin=10)
     # longer
@@ -57,24 +58,25 @@ def main(argv):
     #simulate model
     m = fit_cdp()
     print " "
+    print m.dic
 
     print "Saving graphical representation"
     mc.graph.graph(m, name="cdpgraph", format="pdf",
-                   prog="dot", legend=True, consts=True)
+                   prog="dot", legend=False, consts=True)
 
     #plot parameter autocorrelation
-    print "Plotting parameter distributions"
-    plot_parcorr(m)
+    #print "Plotting parameter distributions"
+    #plot_parcorr(m)
 
     # save parameter estimation data to csv file
-    print "Saving parameter estimates"
-    pars_ffname = "parests.csv"
-    cdpmodvars = ["a","z","p"]
-    m.write_csv(pars_ffname, variables=cdpmodvars)
+    # print "Saving parameter estimates"
+    # pars_ffname = "parests.csv"
+    # cdpmodvars = ["a","z","p"]
+    # m.write_csv(pars_ffname, variables=cdpmodvars)
 
     #combine figures
-    print "Combining figures"
-    pdfcombine = subprocess.check_output(["pdftk", "a.pdf", "z.pdf", "p.pdf", "cat", "output", "allfigs.pdf"])
+    # print "Combining figures"
+    # pdfcombine = subprocess.check_output(["pdftk", "a.pdf", "z.pdf", "p.pdf", "cat", "output", "allfigs.pdf"])
 
 if __name__ == "__main__":
     #import doctest

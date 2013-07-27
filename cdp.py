@@ -1,82 +1,59 @@
-import csv
 import numpy as np
 import pymc
 
-# radon_csv = csv.reader(open('srrs.csv'))
-# radon = []
-# for row in radon_csv:
-#     radon.append(tuple(row))
+def model(N_dp=20, data=np.array([10., 11., 12., -10., -11., -12.])):
+    """
+        Dirichlet process sample measure
+        G = \Sum_{k=1}^{\infty} \pi_k \delta_{phi_k}
 
-# counties = np.array([x[0] for x in radon])
-# y = np.array([float(x[1]) for x in radon])
-# x = np.array([float(x[2]) for x in radon])
+        N_dp:: Size of truncated DP
+        data:: data
+    """
+    # Hyperpriors
+    mu_0 = pymc.Normal('mu_0', mu=0, tau=0.01, value=0)
+    sig_0 = pymc.Uniform('sig_0', lower=0, upper=100, value=1)
+    tau_0 = pymc.Lambda('tau_0', lambda s=sig_0: s**-2)
+    #tau_0 = sig_0 ** -2
 
-# ## gelman adjustment for log
-# y[y==0]=.1
-# y = np.log(y)
+    sig_x = pymc.Uniform('sig_x', lower=0, upper=100)
+    tau_x = pymc.Lambda('tau_x', lambda s=sig_x: s**-2)
 
-# ## groupings
-# def createCountyIndex(counties):
-#     counties_uniq = sorted(set(counties))
-#     counties_dict = dict()
-#     for i, v in enumerate(counties_uniq):
-#         counties_dict[v] = i
-#     ans = np.empty(len(counties),dtype='int')
-#     for i in range(0,len(counties)):
-#         ans[i] = counties_dict[counties[i]]
-#     return ans
+    # Concentration parameter
+    alpha = pymc.Uniform('alpha', lower=0.3, upper=10)
 
-# index_c = createCountyIndex(counties)
+    # Samples from baseline measure (G_0) for DP
+    # determine potential cluster locations (\delta_{phi_k})
+    phi_k = pymc.Normal('phi_k', mu=mu_0, tau=tau_0, size=N_dp)
 
-# Original random effect on intercept
-# a = pymc.Normal('a', mu=mu_a, tau=tau_a, value=np.zeros(len(set(counties))))
+    pi_kp = pymc.Beta('pi_kp', alpha=1, beta=alpha, size=N_dp)
 
-# Size of truncated DP
-N_dp = 50
+    @pymc.deterministic
+    def pi_k(pi_kp=pi_kp, value = np.ones(N_dp)/N_dp):
+        """
+            Calculate Dirichlet probabilities
+            aka Stick-breaking weights
+        """
+        # Probabilities from betas
+        value = [u*np.prod(1-pi_kp[:i]) for i,u in enumerate(pi_kp)]
+        # Enforce sum to unity constraint
+        value[-1] = 1-sum(value[:-1])
 
-# Hyperpriors
-mu_0 = pymc.Normal('mu_0', mu=0, tau=0.01, value=0)
-sig_0 = pymc.Uniform('sig_0', lower=0, upper=100, value=1)
-tau_0 = sig_0 ** -2
+        return value
 
-# Concentration parameter
-alpha = pymc.Uniform('alpha', lower=0.3, upper=10)
+    # Component to which each data point belongs
+    z = pymc.Categorical('z', pi_k, size=len(data))
 
-# Baseline distribution for DP
-theta = pymc.Normal('theta', mu=mu_0, tau=tau_0, size=N_dp)
+    # "Location" of clusters in terms of baseline (G_0)
+    # (\delta_{phi_k})
+    #g = pymc.Lambda('g', lambda z=z, phi_k=phi_k: phi_k[z])
 
-v = pymc.Beta('v', alpha=1, beta=alpha, size=N_dp)
-@pymc.deterministic
-def p(v=v):
-    """ Calculate Dirichlet probabilities """
+    # Observation model
+    x = pymc.Normal('x', mu = phi_k[z], tau = tau_x, value = data,
+                    observed = True)
+    # Model posterior predictive
+    x_sim = pymc.Normal('x_sim', mu = phi_k[z], tau = tau_x, value = data)
 
-    # Probabilities from betas
-    value = [u*np.prod(1-v[:i]) for i,u in enumerate(v)]
-    # Enforce sum to unity constraint
-    value[-1] = 1-sum(value[:-1])
+    # Expected value of random measure
+    #E_dp = pymc.Lambda('E_dp', lambda pi_k=pi_k, phi_k=phi_k: np.inner(pi_k, phi_k))
 
-    return value
-
-# Expected value of random effect
-#E_dp = pymc.Lambda('E_dp', lambda p=p, theta=theta: np.inner(p, theta))
-
-#z = pymc.Categorical('z', p, size=len(set(counties)))
-z = pymc.Categorical('z', p, size=10)
-
-# Index random effect
-a = pymc.Lambda('a', lambda z=z, theta=theta: theta[z])
-
-#b = pymc.Normal('b', mu=0., tau=0.0001)
-
-# sigma_y = pymc.Uniform('sigma_y', lower=0, upper=100)
-# tau_y = pymc.Lambda('tau_y', lambda s=sigma_y: s**-2)
-
-# # Model
-# @pymc.deterministic(plot=False)
-# def y_hat(a=a,b=b):
-#        return a[index_c] + b*x
-
-# # Likelihood
-# @pymc.stochastic(observed=True)
-# def y_i(value=y, mu=y_hat, tau=tau_y):
-#     return pymc.normal_like(value,mu,tau)
+    return vars()
