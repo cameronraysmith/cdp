@@ -17,7 +17,7 @@ def load_cdp_run(pickledb="cdp.pickle"):
 
 def fit_cdp():
     #model = vars(cdp)
-    model = cdp.model()
+    model = cdp.gaussian_dpmm()
 
     #mc.MAP(model).fit(method='fmin_powell')
     mc.MAP(model).fit(method='fmin')
@@ -45,7 +45,22 @@ def fit_cdp():
     return m
 
 def plot_cdp(m, ffname):
-    pass
+    z = m.z.trace()[:]
+    plt.figure(1)
+    plt.subplot(1, 2, 1)
+    plt.hist([len(np.unique(z[i,:])) for i in range(len(z))])
+    plt.xlabel('Components used')
+    plt.ylabel('Frequency')
+    plt.title('truncated K = %d' % m.N_dp)
+    plt.xlim([0, m.N_dp])
+    # plt.subplot(1, 2, 2)
+    # plt.hist([len(np.unique(z10[i,:])) for i in range(len(z10))])
+    # plt.xlabel('Components used')
+    # plt.ylabel('Frequency')
+    # plt.title('K = 30')
+    # plt.xlim([0, 8])
+    plt.savefig(ffname)
+    plt.close()
 
 def plot_parcorr(m):
     parnames = ["a","z","p"]
@@ -63,6 +78,9 @@ def main(argv):
     print "Saving graphical representation"
     mc.graph.graph(m, name="cdpgraph", format="pdf",
                    prog="dot", legend=False, consts=True)
+
+    #plot distribution of components to which each data point belongs
+    plot_cdp(m, "components.pdf")
 
     #plot parameter autocorrelation
     #print "Plotting parameter distributions"
